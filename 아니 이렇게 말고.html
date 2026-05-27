@@ -1,0 +1,290 @@
+import React, { useState, useMemo } from 'react';
+import { Info, CheckCircle2, AlertCircle, XCircle, ChevronRight } from 'lucide-react';
+
+const PolyhedronExplorer = () => {
+  // 상태 관리
+  const [sides, setSides] = useState(3); // 정n각형 (기본: 정삼각형)
+  const [faceCount, setFaceCount] = useState(3); // 한 꼭짓점에 모이는 면의 개수
+
+  // 다각형 정보
+  const polygons = {
+    3: { name: '정삼각형', color: 'fill-yellow-400 stroke-yellow-600' },
+    4: { name: '정사각형', color: 'fill-blue-400 stroke-blue-600' },
+    5: { name: '정오각형', color: 'fill-green-400 stroke-green-600' },
+    6: { name: '정육각형', color: 'fill-purple-400 stroke-purple-600' },
+  };
+
+  // 수학적 계산
+  const interiorAngle = ((sides - 2) * 180) / sides;
+  const totalAngle = interiorAngle * faceCount;
+  const isPolyhedron = faceCount >= 3 && totalAngle < 360;
+  const isFlat = totalAngle === 360;
+  const isOverlap = totalAngle > 360;
+  const isNotEnough = faceCount < 3;
+
+  // 상태 메시지 결정
+  let statusColor = 'bg-gray-100 text-gray-800 border-gray-300';
+  let StatusIcon = Info;
+  let statusTitle = '';
+  let statusMessage = '';
+  let resultName = '';
+
+  if (isNotEnough) {
+    statusColor = 'bg-gray-100 text-gray-700 border-gray-300';
+    StatusIcon = AlertCircle;
+    statusTitle = '입체가 될 수 없어요!';
+    statusMessage = '입체(공간)를 만들려면 한 꼭짓점에 최소 3개의 면이 모여야 해요. 2개 이하는 그냥 평면일 뿐이에요.';
+  } else if (isPolyhedron) {
+    statusColor = 'bg-green-100 text-green-800 border-green-400';
+    StatusIcon = CheckCircle2;
+    statusTitle = '정다면체 완성!';
+    statusMessage = `각의 합이 ${totalAngle}°로 360°보다 작아서, 남는 공간만큼 접어올려 입체를 만들 수 있어요!`;
+    
+    // 정다면체 이름 매칭
+    if (sides === 3 && faceCount === 3) resultName = '정사면체';
+    if (sides === 3 && faceCount === 4) resultName = '정팔면체';
+    if (sides === 3 && faceCount === 5) resultName = '정이십면체';
+    if (sides === 4 && faceCount === 3) resultName = '정육면체';
+    if (sides === 5 && faceCount === 3) resultName = '정십이면체';
+  } else if (isFlat) {
+    statusColor = 'bg-yellow-100 text-yellow-800 border-yellow-400';
+    StatusIcon = AlertCircle;
+    statusTitle = '평면이 되어버려요!';
+    statusMessage = `각의 합이 딱 360°가 되어서 빈틈이 없어요. 접히지 않고 바닥에 평평하게 깔리게 됩니다.`;
+  } else if (isOverlap) {
+    statusColor = 'bg-red-100 text-red-800 border-red-400';
+    StatusIcon = XCircle;
+    statusTitle = '면이 겹쳐버려요!';
+    statusMessage = `각의 합이 ${totalAngle}°로 360°를 넘었어요. 현실에서는 면끼리 겹쳐서 만들 수 없습니다.`;
+  }
+
+  // 다각형 꼭짓점 좌표 생성 함수 (원점을 기준으로 하나의 다각형을 그리기 위함)
+  const getPolygonPoints = (numSides, sideLength) => {
+    let pts = [{ x: 0, y: 0 }];
+    let angleDeg = 0;
+    let extAngle = 360 / numSides;
+    let currX = 0;
+    let currY = 0;
+    
+    for (let i = 0; i < numSides - 1; i++) {
+      currX += sideLength * Math.cos((angleDeg * Math.PI) / 180);
+      currY += sideLength * Math.sin((angleDeg * Math.PI) / 180);
+      pts.push({ x: currX, y: currY });
+      angleDeg += extAngle;
+    }
+    return pts.map(p => `${p.x},${p.y}`).join(' ');
+  };
+
+  const polygonPoints = useMemo(() => getPolygonPoints(sides, 80), [sides]);
+
+  // 빈 공간(Wedge)을 그리기 위한 SVG Arc 경로 계산
+  const getWedgePath = () => {
+    if (totalAngle >= 360 || faceCount < 3) return '';
+    const radius = 60;
+    const startAngle = (totalAngle * Math.PI) / 180;
+    const endAngle = 2 * Math.PI;
+    
+    const startX = radius * Math.cos(startAngle);
+    const startY = radius * Math.sin(startAngle);
+    const endX = radius * Math.cos(endAngle); // radius
+    const endY = radius * Math.sin(endAngle); // 0
+    
+    const largeArcFlag = (360 - totalAngle) > 180 ? 1 : 0;
+    
+    return `M 0 0 L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
+      <div className="max-w-4xl mx-auto space-y-6">
+        
+        {/* 헤더 섹션 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-center">
+          <h1 className="text-3xl font-bold text-indigo-600 mb-2">✨ 정다면체의 비밀 탐험기 🧊</h1>
+          <p className="text-lg text-slate-600">
+            정다면체는 왜 딱 <strong>5가지</strong>밖에 없을까요?<br className="hidden md:block"/>
+            다각형들을 한 꼭짓점에 모아보며 그 비밀을 직접 밝혀보세요!
+          </p>
+        </div>
+
+        {/* 메인 인터랙션 영역 */}
+        <div className="grid md:grid-cols-2 gap-6">
+          
+          {/* 컨트롤 패널 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-bold mb-3 flex items-center">
+                <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full inline-flex items-center justify-center mr-2 text-sm">1</span>
+                어떤 모양을 사용할까요?
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {[3, 4, 5, 6].map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => setSides(num)}
+                    className={`py-3 px-4 rounded-xl border-2 transition-all font-semibold ${
+                      sides === num 
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700' 
+                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    {polygons[num].name} ({((num-2)*180)/num}°)
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold mb-3 flex items-center">
+                <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full inline-flex items-center justify-center mr-2 text-sm">2</span>
+                몇 개를 모아볼까요?
+              </h3>
+              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-xl">
+                {[2, 3, 4, 5, 6].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => setFaceCount(count)}
+                    className={`w-10 h-10 rounded-lg font-bold transition-all ${
+                      faceCount === count
+                        ? 'bg-indigo-500 text-white shadow-md'
+                        : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 수식 요약 */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+              <div className="flex justify-between items-center text-sm mb-2 text-slate-500">
+                <span>한 내각의 크기</span>
+                <span>모인 개수</span>
+                <span>총 모인 각도</span>
+              </div>
+              <div className="flex justify-between items-center font-bold text-xl">
+                <span className="text-indigo-600">{interiorAngle}°</span>
+                <span className="text-slate-400">×</span>
+                <span className="text-indigo-600">{faceCount}개</span>
+                <span className="text-slate-400">=</span>
+                <span className={`${isOverlap ? 'text-red-500' : isFlat ? 'text-yellow-600' : 'text-green-600'}`}>
+                  {totalAngle}°
+                </span>
+              </div>
+              <div className="mt-3 pt-3 border-t border-slate-200 text-center text-sm font-medium text-slate-600">
+                정다면체가 되려면 총 각도가 <span className="text-red-500 font-bold">360°보다 작아야</span> 합니다!
+              </div>
+            </div>
+          </div>
+
+          {/* 시각화 패널 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
+            <svg viewBox="-120 -120 240 240" className="w-full max-w-[280px] h-auto drop-shadow-sm">
+              {/* 360도 기준선 */}
+              <circle cx="0" cy="0" r="100" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="6,6" />
+              
+              {/* 다각형 그리기 */}
+              {Array.from({ length: faceCount }).map((_, i) => (
+                <g key={i} transform={`rotate(${i * interiorAngle})`}>
+                  <polygon
+                    points={polygonPoints}
+                    className={`${polygons[sides].color} opacity-80 stroke-2 origin-top-left transition-all duration-300`}
+                  />
+                  {/* 각도 텍스트 */}
+                  <text 
+                    x="25" y="15" 
+                    fill="#1e293b" 
+                    fontSize="12" 
+                    fontWeight="bold"
+                    transform={`rotate(${interiorAngle / 2}, 0, 0)`}
+                  >
+                    {interiorAngle}°
+                  </text>
+                </g>
+              ))}
+
+              {/* 빈 공간 (접히는 부분) 표시 */}
+              {isPolyhedron && (
+                <g>
+                  <path d={getWedgePath()} fill="#fecaca" opacity="0.6" />
+                  <path d={getWedgePath()} fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="4,4" />
+                </g>
+              )}
+              
+              {/* 중심 꼭짓점 */}
+              <circle cx="0" cy="0" r="4" fill="#1e293b" />
+            </svg>
+
+            {/* 시각화 설명 뱃지 */}
+            {isPolyhedron && (
+              <div className="absolute top-4 right-4 bg-red-100 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full flex items-center shadow-sm border border-red-200">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse" />
+                빈 공간만큼 접을 수 있어요!
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 결과 메시지 */}
+        <div className={`rounded-2xl p-6 border-2 transition-all duration-300 ${statusColor}`}>
+          <div className="flex items-start">
+            <StatusIcon className="w-8 h-8 mr-4 shrink-0 mt-1" />
+            <div>
+              <h2 className="text-xl font-bold mb-1 flex items-center">
+                {statusTitle}
+                {resultName && (
+                  <span className="ml-3 bg-white bg-opacity-50 px-3 py-1 rounded-full text-sm font-black tracking-wide">
+                    🎉 {resultName}
+                  </span>
+                )}
+              </h2>
+              <p className="text-base opacity-90 leading-relaxed">
+                {statusMessage}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 정다면체 요약표 */}
+        <div className="bg-slate-800 text-slate-100 rounded-2xl p-6 shadow-lg">
+          <h3 className="text-lg font-bold mb-4 flex items-center">
+            <span className="text-2xl mr-2">💡</span>
+            그래서 세상에 정다면체는 단 5개뿐입니다!
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-slate-700 p-4 rounded-xl">
+              <div className="text-yellow-400 font-bold mb-2">정삼각형 (60°)</div>
+              <ul className="text-sm space-y-1.5 text-slate-300">
+                <li className="flex items-center"><ChevronRight className="w-4 h-4 mr-1"/>3개 모임 = 정사면체 (180°)</li>
+                <li className="flex items-center"><ChevronRight className="w-4 h-4 mr-1"/>4개 모임 = 정팔면체 (240°)</li>
+                <li className="flex items-center"><ChevronRight className="w-4 h-4 mr-1"/>5개 모임 = 정이십면체 (300°)</li>
+                <li className="text-slate-500 line-through">6개 모임 = 360° (평면)</li>
+              </ul>
+            </div>
+            <div className="bg-slate-700 p-4 rounded-xl">
+              <div className="text-blue-400 font-bold mb-2">정사각형 (90°)</div>
+              <ul className="text-sm space-y-1.5 text-slate-300">
+                <li className="flex items-center"><ChevronRight className="w-4 h-4 mr-1"/>3개 모임 = 정육면체 (270°)</li>
+                <li className="text-slate-500 line-through mt-2">4개 모임 = 360° (평면)</li>
+              </ul>
+            </div>
+            <div className="bg-slate-700 p-4 rounded-xl">
+              <div className="text-green-400 font-bold mb-2">정오각형 (108°)</div>
+              <ul className="text-sm space-y-1.5 text-slate-300">
+                <li className="flex items-center"><ChevronRight className="w-4 h-4 mr-1"/>3개 모임 = 정십이면체 (324°)</li>
+                <li className="text-slate-500 line-through mt-2">4개 모임 = 432° (겹침)</li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-4 p-3 bg-slate-700/50 rounded-lg text-sm text-slate-300 text-center border border-slate-600">
+            <strong>정육각형(120°)</strong>은 3개만 모여도 이미 360°가 되어버려서 정다면체를 절대 만들 수 없답니다!
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default PolyhedronExplorer;
